@@ -1,0 +1,169 @@
+:root {
+  --bg-color: #0b0e11;
+  --neon-pink: #ec4899;
+  --neon-blue: #3b82f6;
+  --neon-yellow: #facc15;
+  --neon-green: #22c55e;
+  --text-primary: #ffffff;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+body {
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Orbitron', sans-serif; /* 사이버펑크/네온 아케이드 느낌 */
+    overflow: hidden; 
+}
+
+#game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(circle at center, #1b212c 0%, #05070a 100%);
+    box-shadow: 0 0 50px rgba(139, 92, 246, 0.4), inset 0 0 20px rgba(0, 0, 0, 0.8);
+    border: 3px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#hud {
+    position: absolute; top: 0; left: 0; width: 100%;
+    display: flex; justify-content: space-between;
+    padding: 15px 25px; pointer-events: none; z-index: 10;
+}
+
+.score-board, .lives-board {
+    font-size: 24px; color: var(--text-primary); font-weight: 700;
+    text-shadow: 0 0 10px var(--neon-blue); letter-spacing: 2px;
+}
+#scoreValue { color: var(--neon-yellow); text-shadow: 0 0 15px var(--neon-yellow); font-size: 28px; }
+#livesValue { color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); }
+
+canvas {
+    display: block;
+    width: 100%; height: 100%;
+    /* 캔버스 자체는 자바스크립트가 그려나감 */
+}
+
+/* Modal Overlay (다이내믹 팝업) */
+#modalOverlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+    display: flex; justify-content: center; align-items: center;
+    opacity: 0; pointer-events: none; transition: 0.4s ease; z-index: 50;
+}
+#modalOverlay.active { opacity: 1; pointer-events: all; }
+
+#modalContent {
+    background: #11151c; border: 2px solid var(--neon-pink);
+    border-radius: 16px; padding: 40px; text-align: center;
+    box-shadow: 0 0 40px rgba(236, 72, 153, 0.6);
+    transform: scale(0.8); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#modalOverlay.active #modalContent { transform: scale(1); }
+
+#modalTitle { 
+    font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 900; 
+    color: #fff; margin-bottom: 10px; text-transform: uppercase;
+    text-shadow: 0 0 20px var(--neon-pink), 0 0 30px var(--neon-pink);
+    letter-spacing: 3px;
+}
+
+#modalDesc { font-family: 'Inter', sans-serif; color: #cbd5e1; font-size: 16px; margin-bottom: 30px; font-weight: 500;}
+
+.modal-buttons { display: flex; gap: 15px; justify-content: center; }
+.action-btn {
+    padding: 14px 30px; font-size: 18px; font-weight: 700; font-family: 'Orbitron', sans-serif;
+    color: #fff; background: transparent; border: 2px solid var(--neon-blue); border-radius: 8px;
+    cursor: pointer; transition: 0.3s; box-shadow: 0 0 15px rgba(59, 130, 246, 0.5) inset;
+    text-transform: uppercase; letter-spacing: 1px;
+}
+.action-btn:hover { background: var(--neon-blue); box-shadow: 0 0 30px var(--neon-blue); transform: translateY(-3px); }
+
+.action-btn.secondary { border-color: #64748b; box-shadow: none; color: #94a3b8; }
+.action-btn.secondary:hover { background: #334155; border-color: #94a3b8; color: #fff; transform: translateY(-3px); }
+
+/* Screen Shake Animation (충격 효과) */
+@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  25% { transform: translate(-3px, 0px) rotate(-1deg); }
+  50% { transform: translate(2px, -1px) rotate(1deg); }
+  75% { transform: translate(-1px, 2px) rotate(0deg); }
+  100% { transform: translate(0px, 0px) rotate(0deg); }
+}
+.shake { animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* Pause Overlay */
+#pauseOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+#pauseOverlay.active {
+    display: flex;
+}
+#pauseOverlay #modalContent {
+    border-color: var(--neon-blue);
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+}
+#pauseOverlay h1 {
+    text-shadow: 0 0 20px var(--neon-blue), 0 0 30px var(--neon-blue);
+}
+
+/* Unified HUD Buttons */
+.hud-center-btns {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+.hud-pill-btn {
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 900;
+    font-family: 'Orbitron', sans-serif;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.hud-pill-btn:hover {
+    transform: scale(1.1) translateY(-2px);
+    filter: brightness(1.2);
+}
+
+.hud-pill-btn:active {
+    transform: scale(0.95);
+}
+
+.hud-pill-btn.pause-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+.hud-pill-btn.lobby-btn {
+    background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+    box-shadow: 0 0 15px rgba(236, 72, 153, 0.5);
+}

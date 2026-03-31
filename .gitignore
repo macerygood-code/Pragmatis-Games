@@ -1,0 +1,15 @@
+# Development scripts
+*.js
+!03_개발팀_CoreDev/**/*.js
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Documentation (Optional, but usually kept)
+# 프라그마티스_게임즈_조직도.md
+
+# Build/Temp files
+tmp/
+dist/
+node_modules/

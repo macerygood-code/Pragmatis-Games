@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON SNAKE PREMIUM - PRAGMATIS GAMES</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+/* CSS Reset & Advanced Neon Style */
+:root {
+    --bg-color: #05070a;
+    --neon-blue: #00f3ff;
+    --neon-pink: #f900bf;
+    --neon-green: #39ff14;
+    --neon-yellow: #facc15;
+    --glass-bg: rgba(11, 15, 25, 0.85);
+    --glass-border: rgba(0, 243, 255, 0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+body {
+    background-color: var(--bg-color);
+    background-image: 
+        radial-gradient(circle at 20% 30%, rgba(0, 243, 255, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(249, 0, 191, 0.05) 0%, transparent 40%);
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#gameContainer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#gameCanvas {
+    background: #000;
+    max-width: 95vw;
+    max-height: 70vh;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 243, 255, 0.1);
+    border: 3px solid #1a1a1a;
+    border-radius: 8px;
+    z-index: 5;
+}
+
+/* Unified 3-Part HUD */
+#hud {
+    position: absolute;
+    top: -80px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+}
+
+.hud-left, .hud-right { min-width: 130px; display: flex; flex-direction: column; }
+.hud-right { align-items: flex-end; }
+.hud-label { font-size: 0.65rem; color: rgba(255,255,255,0.5); letter-spacing: 1px; margin-bottom: 2px; }
+.hud-item { font-size: 1.2rem; font-weight: 900; text-shadow: 0 0 10px currentColor; }
+.neon-blue { color: var(--neon-blue); }
+.neon-pink { color: var(--neon-pink); }
+
+.hud-center-btns {
+    display: flex;
+    gap: 12px;
+}
+
+.hud-pill-btn {
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 12px;
+    font-weight: 900;
+    font-family: 'Orbitron', sans-serif;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(5px);
+    text-transform: uppercase;
+}
+
+.hud-pill-btn:hover { transform: translateY(-3px); background: rgba(255,255,255,0.15); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+.hud-pill-btn:active { transform: scale(0.95); }
+.hud-pill-btn.pause-btn { border-color: var(--neon-blue); }
+.hud-pill-btn.lobby-btn { border-color: var(--neon-pink); }
+
+/* Overlays */
+#overlay, #pauseOverlay {
+    position: absolute;
+    left: 0; top: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+    transition: opacity 0.4s ease;
+}
+
+.panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 50px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(0, 243, 255, 0.15);
+    max-width: 400px;
+}
+
+.title { font-size: 2.8rem; font-weight: 900; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue); margin-bottom: 5px; }
+.subtitle { font-size: 0.9rem; color: #888; margin-bottom: 30px; letter-spacing: 2px; }
+
+.stat-box {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+}
+
+.neon-btn {
+    background: transparent;
+    border: 2px solid var(--neon-pink);
+    color: var(--neon-pink);
+    font-family: 'Orbitron', sans-serif;
+    padding: 16px 45px;
+    cursor: pointer;
+    border-radius: 30px;
+    text-transform: uppercase;
+    font-weight: 900;
+    transition: 0.3s;
+    letter-spacing: 3px;
+    box-shadow: 0 0 10px rgba(249, 0, 191, 0.2);
+}
+.neon-btn:hover { background: var(--neon-pink); color: white; box-shadow: 0 0 30px var(--neon-pink); transform: scale(1.05); }
+
+/* Mobile Controls */
+#mobileControls {
+    display: none;
+    margin-top: 30px;
+    width: 240px;
+    height: 160px;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 15px;
+    z-index: 10;
+}
+@media (pointer: coarse) { #mobileControls { display: grid; } }
+
+.dpad-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 28px;
+    cursor: pointer;
+}
+.dpad-btn:active { background: rgba(0, 243, 255, 0.3); color: var(--neon-blue); border-color: var(--neon-blue); transform: scale(0.9); }
+
+#upBtn { grid-column: 2; grid-row: 1; }
+#leftBtn { grid-column: 1; grid-row: 2; }
+#rightBtn { grid-column: 3; grid-row: 2; }
+#downBtn { grid-column: 2; grid-row: 2; }
+
+@keyframes newBest {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); color: var(--neon-green); }
+    100% { transform: scale(1); }
+}
+.animate-best { animation: newBest 0.5s ease; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="hud">
+            <div class="hud-left">
+                <span class="hud-label">CURRENT SCORE</span>
+                <div class="hud-item neon-blue" id="scoreVal">0</div>
+            </div>
+            <div class="hud-center-btns">
+                <button id="hudPauseBtn" class="hud-pill-btn pause-btn">❚❚</button>
+                <button id="hudLobbyBtn" class="hud-pill-btn lobby-btn">LOBBY</button>
+            </div>
+            <div class="hud-right">
+                <span class="hud-label">PERSONAL BEST</span>
+                <div class="hud-item neon-pink" id="bestVal">0</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="mobileControls">
+            <div id="upBtn" class="dpad-btn">▲</div>
+            <div id="leftBtn" class="dpad-btn">◀</div>
+            <div id="downBtn" class="dpad-btn">▼</div>
+            <div id="rightBtn" class="dpad-btn">▶</div>
+        </div>
+
+        <div id="overlay">
+            <div class="panel">
+                <h1 class="title">NEON SNAKE</h1>
+                <p class="subtitle">EVOLVED ARCADE</p>
+                <div id="gameOverInfo" style="display: none;">
+                    <div class="stat-box">
+                        <h2 style="color: var(--neon-pink); margin-bottom: 5px;">SHUTDOWN</h2>
+                        <p style="font-size: 0.8rem; color: #666;">FINAL SEQUENCE SCORE</p>
+                        <p id="finalScore" class="neon-blue" style="font-size: 2rem; font-weight: 900;">0</p>
+                    </div>
+                </div>
+                <button id="startBtn" class="neon-btn">BOOT UP</button>
+            </div>
+        </div>
+
+        <div id="pauseOverlay" style="display: none;">
+            <div class="panel">
+                <h1 class="title" style="font-size: 2rem;">SUSPENDED</h1>
+                <p class="subtitle">PAUSE MODE ACTIVE</p>
+                <button id="resumeBtn" class="neon-btn">RESUME</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * AUDIO SYSTEM (Web Audio API)
+         */
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(freq, type, duration, vol) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type || 'square';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol || 0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const sounds = {
+            move: () => playSound(150, 'sine', 0.1, 0.02),
+            eat: () => {
+                playSound(400, 'square', 0.2, 0.1);
+                setTimeout(() => playSound(600, 'square', 0.2, 0.1), 50);
+            },
+            death: () => {
+                playSound(200, 'sawtooth', 0.5, 0.15);
+                playSound(100, 'sawtooth', 0.8, 0.1);
+            },
+            ui: () => playSound(800, 'sine', 0.1, 0.05),
+            best: () => {
+                const now = audioCtx.currentTime;
+                [880, 1108.73, 1318.51].forEach((f, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    osc.frequency.setValueAtTime(f, now + i*0.1);
+                    g.gain.setValueAtTime(0.1, now + i*0.1);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + i*0.1 + 0.5);
+                    osc.connect(g); g.connect(audioCtx.destination);
+                    osc.start(now + i*0.1); osc.stop(now + i*0.1 + 0.5);
+                });
+            }
+        };
+
+        /**
+         * GAME ENGINE
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 20;
+        let tileCount;
+
+        let score = 0;
+        let highScore = localStorage.getItem('neonSnakeBest') || 0;
+        let isPlaying = false;
+        let isPaused = false;
+        let bestBeaten = false;
+        
+        let snake = [];
+        let food = { x: 5, y: 5 };
+        let dx = 0, dy = 0;
+        let nextDx = 0, nextDy = 0;
+        let lastTime = 0;
+        let accumulator = 0;
+        let tickRate = 130; // ms per tick
+        let shakeTime = 0;
+
+        function resize() {
+            const containerWidth = window.innerWidth * 0.95;
+            const containerHeight = window.innerHeight * 0.6;
+            const size = Math.min(containerWidth, containerHeight);
+            canvas.width = Math.floor(size / gridSize) * gridSize;
+            canvas.height = canvas.width;
+            tileCount = canvas.width / gridSize;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        function initGame() {
+            initAudio();
+            sounds.ui();
+            snake = [{ x: 10, y: 10 }, { x: 10, y: 11 }, { x: 10, y: 12 }];
+            dx = 0; dy = -1;
+            nextDx = 0; nextDy = -1;
+            score = 0;
+            tickRate = 130;
+            bestBeaten = false;
+            updateHUD();
+            placeFood();
+            
+            document.getElementById('overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('overlay').style.display = 'none', 400);
+            isPlaying = true;
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function placeFood() {
+            food.x = Math.floor(Math.random() * tileCount);
+            food.y = Math.floor(Math.random() * tileCount);
+            if(snake.some(segment => segment.x === food.x && segment.y === food.y)) placeFood();
+        }
+
+        function gameLoop(time) {
+            if(!isPlaying) return;
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            if(!isPaused) {
+                accumulator += deltaTime;
+                while(accumulator >= tickRate) {
+                    update();
+                    accumulator -= tickRate;
+                }
+            }
+
+            draw(time);
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            dx = nextDx; dy = nextDy;
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            // Wall Collision
+            if(head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) return startGameOver();
+            // Self Collision
+            if(snake.some(segment => segment.x === head.x && segment.y === head.y)) return startGameOver();
+
+            snake.unshift(head);
+
+            if(head.x === food.x && head.y === food.y) {
+                score += 10;
+                sounds.eat();
+                if(score > highScore && !bestBeaten && highScore > 0) {
+                    bestBeaten = true;
+                    sounds.best();
+                    document.getElementById('bestVal').classList.add('animate-best');
+                    setTimeout(() => document.getElementById('bestVal').classList.remove('animate-best'), 1000);
+                }
+                // Increase speed
+                tickRate = Math.max(60, 130 - Math.floor(score / 40) * 5);
+                updateHUD();
+                placeFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function draw(time) {
+            ctx.save();
+            // Screen Shake
+            if(shakeTime > 0) {
+                const shift = Math.sin(time * 0.1) * shakeTime;
+                ctx.translate(shift, shift);
+                shakeTime *= 0.9;
+                if(shakeTime < 0.1) shakeTime = 0;
+            }
+
+            // Glow Background
+            ctx.fillStyle = '#010204';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle Grid
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
+            ctx.lineWidth = 1;
+            for(let i=0; i<=tileCount; i++) {
+                ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i*gridSize); ctx.lineTo(canvas.width, i*gridSize); ctx.stroke();
+            }
+
+            // Food (Pulsing)
+            const pulse = 0.5 + 0.5 * Math.sin(time * 0.01);
+            const foodSize = gridSize - 6 + pulse * 4;
+            const offset = (gridSize - foodSize) / 2;
+            
+            ctx.shadowBlur = 15; ctx.shadowColor = 'var(--neon-yellow)';
+            ctx.fillStyle = 'var(--neon-yellow)';
+            ctx.beginPath();
+            ctx.roundRect(food.x * gridSize + offset, food.y * gridSize + offset, foodSize, foodSize, 4);
+            ctx.fill();
+
+            // Snake
+            snake.forEach((segment, index) => {
+                const isHead = index === 0;
+                const alpha = Math.max(0.2, 1 - (index / snake.length));
+                
+                if(isHead) {
+                    ctx.shadowBlur = 25;
+                    ctx.shadowColor = 'var(--neon-blue)';
+                    ctx.fillStyle = 'var(--neon-blue)';
+                } else {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = `rgba(0, 243, 255, ${alpha * 0.5})`;
+                    ctx.fillStyle = `rgba(0, 243, 255, ${alpha})`;
+                }
+                
+                const s = isHead ? gridSize - 2 : gridSize - 4;
+                const o = (gridSize - s) / 2;
+                ctx.beginPath();
+                ctx.roundRect(segment.x * gridSize + o, segment.y * gridSize + o, s, s, isHead ? 5 : 3);
+                ctx.fill();
+            });
+
+            ctx.restore();
+        }
+
+        function startGameOver() {
+            isPlaying = false;
+            shakeTime = 12;
+            sounds.death();
+            if(score > highScore) {
+                highScore = score;
+                localStorage.setItem('neonSnakeBest', highScore);
+            }
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('gameOverInfo').style.display = 'block';
+            document.getElementById('overlay').style.display = 'flex';
+            setTimeout(() => document.getElementById('overlay').style.opacity = '1', 10);
+            document.getElementById('startBtn').innerText = 'REBOOT';
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreVal').innerText = score;
+            document.getElementById('bestVal').innerText = Math.max(score, highScore);
+        }
+
+        /**
+         * CONTROLS
+         */
+        function setDir(nx, ny) {
+            if (nx === -dx && nx !== 0) return;
+            if (ny === -dy && ny !== 0) return;
+            nextDx = nx; nextDy = ny;
+        }
+
+        window.addEventListener('keydown', e => {
+            if(e.key === 'ArrowUp') setDir(0, -1);
+            if(e.key === 'ArrowDown') setDir(0, 1);
+            if(e.key === 'ArrowLeft') setDir(-1, 0);
+            if(e.key === 'ArrowRight') setDir(1, 0);
+            if(e.key === 'p' || e.key === 'Escape') togglePause();
+        });
+
+        // Mobile Controls
+        const controlBtns = {
+            upBtn: [0, -1], leftBtn: [-1, 0], downBtn: [0, 1], rightBtn: [1, 0]
+        };
+        Object.keys(controlBtns).forEach(id => {
+            document.getElementById(id).addEventListener('touchstart', e => {
+                e.preventDefault();
+                initAudio();
+                const [x, y] = controlBtns[id];
+                setDir(x, y);
+            });
+        });
+
+        // Swipes as fallback
+        let touchStartX = 0, touchStartY = 0;
+        canvas.addEventListener('touchstart', e => {
+            initAudio();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, {passive: false});
+
+        canvas.addEventListener('touchmove', e => e.preventDefault(), {passive: false});
+
+        canvas.addEventListener('touchend', e => {
+            const xDiff = e.changedTouches[0].clientX - touchStartX;
+            const yDiff = e.changedTouches[0].clientY - touchStartY;
+            if (Math.abs(xDiff) > Math.abs(yDiff)) {
+                if(Math.abs(xDiff) > 30) setDir(xDiff > 0 ? 1 : -1, 0);
+            } else {
+                if(Math.abs(yDiff) > 30) setDir(0, yDiff > 0 ? 1 : -1);
+            }
+        }, {passive: false});
+
+        function togglePause() {
+            if(!isPlaying) return;
+            initAudio();
+            isPaused = !isPaused;
+            sounds.ui();
+            document.getElementById('pauseOverlay').style.display = isPaused ? 'flex' : 'none';
+        }
+
+        window.onblur = () => { if(isPlaying && !isPaused) togglePause(); };
+
+        document.getElementById('startBtn').onclick = initGame;
+        document.getElementById('hudLobbyBtn').onclick = () => {
+            window.parent.postMessage('backToLobby', '*');
+        }
+        document.getElementById('hudPauseBtn').onclick = togglePause;
+        document.getElementById('resumeBtn').onclick = togglePause;
+    </script>
+</body>
+</html>

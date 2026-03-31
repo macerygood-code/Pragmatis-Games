@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SUPER WEB MARIO (FULL SPEC) - KJCOMTECH</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        @font-face { font-family: 'RetroFont'; src: url('https://fonts.gstatic.com/s/pressstart2p/v14/e3t4euO8T-267VNWAwRjjg8cZFcLtuw.woff2') format('woff2'); }
+        body { background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; overflow: hidden; font-family: 'RetroFont', sans-serif; touch-action: none; }
+        #gameContainer { position: relative; width: 100%; height: 100%; max-width: 800px; max-height: 480px; background-color: #5c94fc; overflow: hidden; transition: background-color 0.5s; }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        #hud { position: absolute; top: 10px; left: 20px; right: 20px; display: flex; justify-content: space-between; color: white; font-size: 14px; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+        .hud-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        
+        /* 모바일 패드 (좌/우, 하강, B버튼(대시/불꽃), A버튼(점프)) */
+        #controls { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 15px; pointer-events: none; }
+        .d-pad, .action-btns { display: grid; gap: 5px; }
+        .d-pad { grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px; }
+        #btnLeft { grid-column: 1; grid-row: 2; }
+        #btnRight { grid-column: 3; grid-row: 2; }
+        #btnDown { grid-column: 2; grid-row: 2; }
+        
+        .action-btns { grid-template-columns: 50px 50px; align-items: end; }
+        #btnFire { grid-column: 1; margin-bottom: 20px; }
+        #btnJump { grid-column: 2; }
+
+        .btn { background-color: rgba(255, 255, 255, 0.4); border: 2px solid rgba(0, 0, 0, 0.3); border-radius: 5px; pointer-events: auto; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #000; font-weight: bold; width: 100%; height: 100%; }
+        .btn.round { border-radius: 50%; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+        .btn:active { background-color: rgba(255, 255, 255, 0.7); transform: translateY(2px); box-shadow: none; }
+        
+        @media (min-width: 800px) { #controls { opacity: 0.15; } }
+
+        #overlay, #pauseOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+        #pauseOverlay { background-color: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: none; z-index: 20; border: 1px solid rgba(255,255,255,0.1); }
+        .title { font-size: 20px; color: #ff3c28; margin-bottom: 20px; line-height: 1.5; text-align: center; text-shadow: 2px 2px 0 #fff; }
+        .start-btn { background-color: #ffd700; border: 4px solid #fff; color: #000; padding: 15px; font-family: inherit; font-size: 16px; cursor: pointer; border-radius: 8px; margin: 10px; transition: transform 0.2s; }
+        .start-btn:hover { transform: scale(1.05); background-color: #fff; }
+
+        #hud { 
+            position: absolute; top: 0; left: 0; width: 100%; padding: 15px 25px; 
+            display: flex; justify-content: space-between; align-items: flex-start;
+            color: white; font-size: 14px; text-shadow: 2px 2px 0 #000; pointer-events: none; z-index: 10;
+        }
+        .hud-left, .hud-right { display: flex; gap: 25px; }
+        .hud-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+
+        /* Unified HUD Buttons */
+        .hud-center-btns {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 25;
+            pointer-events: auto;
+        }
+        .hud-pill-btn {
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 900;
+            font-family: 'Orbitron', sans-serif, 'RetroFont';
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .hud-pill-btn:hover { transform: scale(1.1) translateY(-2px); filter: brightness(1.2); }
+        .pause-btn { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+        .lobby-btn { background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); box-shadow: 0 0 15px rgba(236, 72, 153, 0.5); }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="hud">
+        <div class="hud-left">
+            <div class="hud-stat">MARIO<br><span id="scoreVal">000000</span></div>
+            <div class="hud-stat">COINS<br>x<span id="coinVal">00</span></div>
+        </div>
+        <div class="hud-center-btns">
+            <button id="hudPauseBtn" class="hud-pill-btn pause-btn">
+                <span style="font-size: 10px;">❚❚</span> PAUSE
+            </button>
+            <button id="hudLobbyBtn" class="hud-pill-btn lobby-btn">
+                <span style="font-size: 12px;">◀</span> LOBBY
+            </button>
+        </div>
+        <div class="hud-right">
+            <div class="hud-stat">WORLD<br><span id="worldVal">1-1</span></div>
+            <div class="hud-stat">TIME<br><span id="timeVal">400</span></div>
+        </div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="480"></canvas>
+    
+    <div id="controls">
+        <div class="d-pad">
+            <div class="btn" id="btnLeft">◀</div>
+            <div class="btn" id="btnDown">▼</div>
+            <div class="btn" id="btnRight">▶</div>
+        </div>
+        <div class="action-btns">
+            <!-- B 버튼 (파이어/달리기) --><div class="btn round" id="btnFire" style="background-color: #ffaa00;">B</div>
+            <!-- A 버튼 (점프) --><div class="btn round" id="btnJump" style="background-color: #ff3c28;">A</div>
+        </div>
+    </div>
+
+        <div id="overlay">
+            <div class="panel" style="text-align: center;">
+                <h1 class="title" id="mainTitle">SUPER WEB MARIO<br>풀스펙 에디션</h1>
+                <p style="color: #ccc; font-size:10px; line-height: 2; margin-bottom: 30px;">
+                    버섯(성장)/불꽃(파이어볼)/파이프워프 완벽 지원!<br>
+                    PC: 방향키(이동), 스페이스바/Z/↑(점프), X(파이어/대시)<br>
+                    모바일: 하단 가상패드
+                </p>
+                <button class="start-btn" id="startBtn">START</button>
+                <button class="start-btn" id="lobbyBtn" style="background-color: #5c94fc; margin-left: 10px;">LOBBY</button>
+            </div>
+        </div>
+        <div id="pauseOverlay" style="display: none;">
+            <h1 class="title">SYSTEM PAUSED</h1>
+            <button class="start-btn" id="resumeBtn">RESUME</button>
+            <button class="start-btn" id="pauseLobbyBtn" style="background-color: #5c94fc;">QUIT TO LOBBY</button>
+        </div>
+    </div>
+
+<script>
+document.getElementById('lobbyBtn').addEventListener('click', () => {
+    window.parent.postMessage('backToLobby', '*');
+});
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('gameContainer');
+
+// 상수
+const TS = 32;       // 타일크기
+const FPS = 60;
+const GRAVITY = 0.55;
+const JUMP_PWR = -15;       // 점프 높이 대폭 증가
+const JUMP_PWR_BIG = -16;   // 큰 체형은 더 높게
+const MAX_FALL = 14;
+const ACCEL = 0.3;
+const FRICTION = 0.85;
+
+let MAX_SPEED = 3.5;   // 기본 달리기
+
+let gameState = {
+    running: false,
+    paused: false,
+    camX: 0,
+    score: 0, coins: 0, time: 400, lastT: 0,
+    levelMap: [], underGround: false
+};
+
+let keys = { left:false, right:false, down:false, jump:false, fire:false };
+
+let player;
+let blocks = [];
+let items = [];
+let enemies = [];
+let fireballs = [];
+let particles = [];
+let goal = null;
+let currentArea = "main"; // "main" or "underground"
+
+// ===============================================
+// 맵 데이터 설계
+// C: 공중동전, M: 시작, G:바닥, B:벽돌(부서짐), ?:아이템상자, H:단단블록, W:워프파이프입구, P:일반파이프, p:파이프몸통
+// E: 굼바, F: 깃발, !:숨겨진구역 나오는 파이프
+// ===============================================
+const maps = {
+    main: [
+        "                                                                                                                      ",
+        "                                                                                                                      ",
+        "                                                                                                      F               ",
+        "                                           H                                                          p               ",
+        "                ???      CCC             H H                                                          p               ",
+        "                       B?B?B           H H H                                                          p               ",
+        "                                     H H H H     ???                                                  p               ",
+        "                                   H H H H H                                          B               p               ",
+        "                 E            W    H H H H H               E     E    E            BB B               p               ",
+        "       ?                    P p    H H H H H                 P    P    P          BBB B               p               ",
+        " M   B?B?B       E        P p p    H H H H H                 p    p    p         BBBB B               p               ",
+        "GGGGGGGGGGGGGGGGGGGG    GGGGGGGGGGGGGGGGGGGGGG   GGGGGGGGGG  p G  p G  p  GGGG   GGGGGGGGGGGGGGGGGG  GGGGGGGGGGGGGGGGG",
+        "GGGGGGGGGGGGGGGGGGGG    GGGGGGGGGGGGGGGGGGGGGG   GGGGGGGGGG  p G  p G  p  GGGG   GGGGGGGGGGGGGGGGGG  GGGGGGGGGGGGGGGGG",
+    ],
+    underground: [ // 어두운 테마 동전방
+        "                                ",
+        "  HHHHHHHHHHHHHHHHHHHHHHHH      ",
+        "  HCCCCCC  CCCCCC   CCCCCH      ",
+        "  HC    C  C    C   C    CH     ",
+        "  HC    C  C    C   C    CH     ",
+        "  HCCCCCC  C    C   C    CH     ",
+        "  HC       C    C   C    CH     ",
+        "  HC       CCCCCC   CCCCCH      ",
+        "  H                      H      ",
+        "  H                      H    ! ",
+        "  HH    E            E   H    p ",
+        "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+        "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+    ]
+};
+
+// ===============================================
+// 클래스(객체) 
+// ===============================================
+class Player {
+    constructor(x, y) {
+        this.resetPos(x, y);
+        this.power = 0; // 0=작음, 1=슈퍼, 2=파이어
+        this.vx = 0; this.vy = 0;
+        this.w = 20; this.h = 24; 
+        this.grounded = false;
+        this.invincT = 0; // 무적 타이머
+        this.state = 'idle'; // 대기, 걷기, 점프, 워프, 사망
+        this.warpTimer = 0;
+        this.deadTimer = 0;
+        this.facing = 1; // 1우측, -1좌측
+    }
+
+    resetPos(x, y) {
+        this.x = x * TS; this.y = y * TS;
+    }
+
+    setPower(pt) {
+        let oldCenter = this.y + this.h; 
+        this.power = pt;
+        if (pt === 0) { this.w = 20; this.h = 24; }
+        else { this.w = 24; this.h = 42; } // 슈퍼부터 커짐
+        this.y = oldCenter - this.h; // 발 위치 고정
+    }
+
+    damage() {
+        if (this.invincT > 0 || this.state === 'dead' || this.state === 'win') return;
+        if (this.power > 0) {
+            // 작아지면서 짧은 무적
+            this.setPower(0);
+            this.invincT = 90; // 1.5초 무적
+        } else {
+            // 사망
+            this.state = 'dead';
+            this.vy = -12;
+            container.style.backgroundColor = '#000'; // 분위기 반전
+            setTimeout(()=> showOverlay("YOU DIED", "화면 터치로 재설정", "다시하기"), 2500);
+        }
+    }
+
+    update() {
+        // 이번 프레임 시작 전 발바닥 위치를 저장 (밟기 판정에 사용)
+        this.lastBottom = this.y + this.h;
+        
+        if (this.invincT > 0) this.invincT--;
+        
+        if (this.state === 'dead') {
+            this.vy += GRAVITY; this.y += this.vy; return;
+        }
+        if (this.state === 'win') {
+            this.vx *= FRICTION; this.vy += GRAVITY; this.x += this.vx; this.y += this.vy; this.grounded=false; this.checkY(); return;
+        }
+        if (this.state === 'warpD' || this.state === 'warpU') {
+            // 파이프 들어가는 중 (아래로 / 위로)
+            this.warpTimer--;
+            this.y += (this.state==='warpD') ? 1 : -1;
+            if (this.warpTimer <= 0) doWarpChange(); 
+            return;
+        }
+
+        // 키 액션
+        if (keys.left) { this.vx -= ACCEL; this.facing = -1; }
+        else if (keys.right) { this.vx += ACCEL; this.facing = 1; }
+        else this.vx *= FRICTION;
+
+        // B대시
+        MAX_SPEED = keys.fire ? 5 : 3.5;
+
+        if (this.vx > MAX_SPEED) this.vx = MAX_SPEED;
+        if (this.vx < -MAX_SPEED) this.vx = -MAX_SPEED;
+
+        if (keys.jump && this.grounded) {
+            this.vy = (this.power>0) ? JUMP_PWR_BIG : JUMP_PWR;
+            this.grounded = false; keys.jump = false;
+        }
+
+        this.vy += GRAVITY;
+        if (this.vy > MAX_FALL) this.vy = MAX_FALL;
+
+        // X 충돌
+        this.x += this.vx;
+        this.checkX();
+        if (this.x < gameState.camX) { this.x = gameState.camX; this.vx = 0; } // 왼쪽화면 막기
+
+        // Y 충돌
+        this.y += this.vy;
+        this.grounded = false;
+        this.checkY();
+
+        // 파이프 위에서 Down
+        if (keys.down && this.grounded && !keys.left && !keys.right) {
+            let cx = this.x + this.w/2;
+            for (let b of blocks) {
+                if (b.type === 'W' && this.y + this.h === b.y && cx > b.x && cx < b.x + b.w) {
+                    this.state = 'warpD';
+                    this.warpTimer = 50; // 점점 내려가는 시간
+                    this.x = b.x + (b.w - this.w)/2; // 중앙 정렬
+                    break;
+                }
+            }
+        }
+
+        // 파이어볼 투척
+        if (keys.fire && this.power === 2 && fireballs.length < 2) {
+            // 파이어볼 쿨타임 (버튼 누른 순간 한번만)
+            keys.fire = false; 
+            fireballs.push(new Fireball(this.x + this.w/2, this.y + this.h/2, this.facing));
+        }
+
+        // 추락사
+        if (this.y > canvas.height + 100) this.damage();
+    }
+
+    draw() {
+        if (this.invincT > 0 && Math.floor(this.invincT/4)%2===0) return; // 깜빡임
+
+        ctx.save();
+        let sx = this.x - gameState.camX;
+        
+        // 뒷통수 기준 그리기 처리용 (배경 클리핑 무시)
+        if (this.state === 'warpD' || this.state === 'warpU') {
+           ctx.globalAlpha = 1; // 워프중엔 그냥 그린다(CSS로 가려져야 하지만 편의상)
+        }
+
+        // 컬러 설정 (기본:레드, 파이어:흰/주황)
+        if (this.power === 0 || this.power === 1) ctx.fillStyle = '#ff3c28';
+        else ctx.fillStyle = '#fff';
+
+        ctx.fillRect(sx, this.y, this.w, this.h);
+        
+        // 바지(하단) 색 (일반: 파란바지, 파이어: 주황바지)
+        ctx.fillStyle = (this.power===2) ? '#ff3c28' : '#0000ff';
+        ctx.fillRect(sx, this.y + this.h - Math.min(10, this.h/2), this.w, Math.min(8, this.h/2));
+
+        // 모자 창 (얼굴)
+        ctx.fillStyle = '#ffcc99'; // 피부색
+        ctx.fillRect(sx + (this.facing===1 ? this.w-10 : 0), this.y+4, 10, 8);
+        
+        // 눈
+        ctx.fillStyle = 'black';
+        ctx.fillRect(sx + (this.facing===1 ? this.w-4 : 2), this.y+6, 2, 2);
+
+        ctx.restore();
+    }
+
+    checkX() {
+        for (let b of blocks) {
+            if (!b.solid) continue;
+            if (isCol(this, b)) {
+                if (this.vx > 0) { this.x = b.x - this.w; this.vx = 0; }
+                else if (this.vx < 0) { this.x = b.x + b.w; this.vx = 0; }
+            }
+        }
+    }
+    checkY() {
+        for (let b of blocks) {
+            if (!b.solid) continue;
+            if (isCol(this, b)) {
+                if (this.vy > 0) { this.y = b.y - this.h; this.vy = 0; this.grounded = true; }
+                else if (this.vy < 0) { 
+                    this.y = b.y + b.h; this.vy = 0;
+                    b.hit(this); // 블록 치기
+                }
+            }
+        }
+    }
+}
+
+class Block {
+    constructor(c, r, ch) {
+        this.x = c*TS; this.y = r*TS; this.w = TS; this.h = TS;
+        this.type = ch;
+        this.solid = true;
+        this.active = true;
+        // 파이프 뚱뚱하게 처리
+        if (ch==='W' || ch==='P' || ch==='!' || ch==='T') { this.w = TS*2; }
+        if (ch==='p') { this.w = TS*2; }
+    }
+    
+    hit(playerBody) {
+        if (this.type === 'B') {
+            if (playerBody.power > 0) {
+                // 부숨
+                this.solid = false; this.type = ' ';
+                createParticles(this.x+16, this.y+16, '#cb4a00', 6);
+                addScore(50);
+            } else {
+                // 못부수고 살짝 튕김 (애니메이션은 단순화)
+                createParticles(this.x+16, this.y+16, '#cb4a00', 2);
+            }
+        } else if (this.type === '?') {
+            if (this.active) {
+                this.active = false;
+                // 버섯(커짐), 아이스플라워(파이어)
+                if (playerBody.power === 0) {
+                    items.push(new Item(this.x, this.y-TS, 'MUSHROOM')); // 버섯
+                } else {
+                    items.push(new Item(this.x, this.y-TS, 'FLOWER')); // 파이어플라워
+                }
+            }
+        } else if (this.type === 'C') { // 동전블록
+            if (this.active) {
+                this.active = false;
+                this.type = 'H'; // 이후 단단블록화
+                addCoin(); addScore(100);
+                createParticles(this.x+16, this.y-16, '#ffd700', 10);
+            }
+        }
+    }
+
+    draw() {
+        let sx = this.x - gameState.camX;
+        if (sx < -this.w || sx > canvas.width) return;
+        ctx.save();
+        if (this.type === 'G') {
+            ctx.fillStyle = gameState.underGround ? '#0033cc' : '#cb4a00';
+            ctx.fillRect(sx, this.y, this.w, this.h);
+            ctx.fillStyle = gameState.underGround ? '#001144' : '#228b22';
+            ctx.fillRect(sx, this.y, this.w, 4);
+        } else if (this.type === 'B') {
+            ctx.fillStyle = gameState.underGround ? '#0044aa' : '#b22222';
+            ctx.fillRect(sx, this.y, this.w, this.h);
+            ctx.strokeStyle = '#000'; ctx.strokeRect(sx, this.y, this.w, this.h);
+            ctx.beginPath(); ctx.moveTo(sx, this.y+16); ctx.lineTo(sx+32, this.y+16); ctx.moveTo(sx+16, this.y); ctx.lineTo(sx+16, this.y+16); ctx.stroke();
+        } else if (this.type === '?' || this.type === 'C') {
+            ctx.fillStyle = this.active ? '#ffaa00' : '#885500';
+            ctx.fillRect(sx, this.y, this.w, this.h);
+            ctx.strokeStyle = '#000'; ctx.strokeRect(sx, this.y, this.w, this.h);
+            if (this.active) { ctx.fillStyle = '#000'; ctx.fillText("?", sx+10, this.y+22); }
+        } else if (this.type === 'H') {
+            ctx.fillStyle = '#aa5500'; ctx.fillRect(sx, this.y, this.w, this.h);
+            ctx.strokeStyle = '#000'; ctx.strokeRect(sx, this.y, this.w, this.h);
+        } else if (this.type === 'W' || this.type === 'P' || this.type === '!') {
+            ctx.fillStyle = '#00cc00'; ctx.fillRect(sx, this.y, this.w, this.h);
+            ctx.strokeStyle = '#000'; ctx.strokeRect(sx, this.y, this.w, this.h);
+            ctx.fillStyle = '#55ff55'; ctx.fillRect(sx+4, this.y, 8, this.h);
+        } else if (this.type === 'p') {
+            ctx.fillStyle = '#00aa00'; ctx.fillRect(sx+2, this.y, this.w-4, this.h);
+            ctx.fillStyle = '#55ff55'; ctx.fillRect(sx+6, this.y, 8, this.h);
+        }
+        ctx.restore();
+    }
+}
+
+class Item {
+    constructor(x, y, kind) {
+        this.x = x; this.y = y; this.w = 28; this.h = 28;
+        this.kind = kind;
+        this.vx = (kind==='MUSHROOM') ? 1.5 : 0;
+        this.vy = -3;
+        this.color = (kind==='MUSHROOM') ? '#ffaa00' : '#ff5500';
+        this.active = true;
+    }
+    update() {
+        if (!this.active) return;
+        this.vy += GRAVITY;
+        this.x += this.vx;
+        for (let b of blocks) {
+            if (b.solid && isCol(this, b)) {
+                if (this.vx>0) { this.x = b.x-this.w; this.vx *= -1; }
+                else if (this.vx<0) { this.x = b.x+b.w; this.vx *= -1; }
+            }
+        }
+        this.y += this.vy;
+        for (let b of blocks) {
+            if (b.solid && isCol(this, b) && this.vy>0) {
+                this.y = b.y - this.h; this.vy = 0;
+            }
+        }
+        // 낙하
+        if (this.y > 600) this.active = false;
+    }
+    draw() {
+        if (!this.active) return;
+        let sx = this.x - gameState.camX;
+        ctx.save();
+        if (this.kind === 'MUSHROOM') {
+            ctx.fillStyle = '#fff'; ctx.fillRect(sx+4, this.y+12, 20, 16); // 기둥
+            ctx.fillStyle = '#ff0000'; ctx.fillRect(sx, this.y, 28, 12); // 머리
+            ctx.fillStyle = '#fff'; ctx.fillRect(sx+4, this.y+2, 6, 6); ctx.fillRect(sx+18, this.y+2, 6, 6);
+        } else {
+            ctx.fillStyle = '#00ff00'; ctx.fillRect(sx+12, this.y+14, 4, 14); // 줄기
+            ctx.fillStyle = '#ff9900'; ctx.fillRect(sx+6, this.y, 16, 16); // 꽃잎
+            ctx.fillStyle = '#ffff00'; ctx.fillRect(sx+10, this.y+4, 8, 8); // 수술
+        }
+        ctx.restore();
+    }
+}
+
+class Coin { // 허공의 동전
+    constructor(x, y) { this.x=x*TS+8; this.y=y*TS; this.w=16; this.h=24; this.active=true; }
+    update() {}
+    draw() {
+        if(!this.active) return;
+        let sx = this.x - gameState.camX;
+        ctx.fillStyle = '#ffd700'; ctx.fillRect(sx, this.y, this.w, this.h);
+        ctx.fillStyle = '#fff'; ctx.fillRect(sx+4, this.y+4, 4, 16);
+    }
+}
+
+class Fireball {
+    constructor(x, y, dir) {
+        this.x = x; this.y = y; this.w = 12; this.h = 12;
+        this.vx = 6 * dir; this.vy = 2;
+        this.active = true;
+    }
+    update() {
+        if (!this.active) return;
+        this.vy += GRAVITY*0.8;
+        this.x += this.vx;
+        for (let b of blocks) {
+            if (b.solid && isCol(this, b)) { this.active = false; createParticles(this.x, this.y, '#ff5500', 3); return; }
+        }
+        this.y += this.vy;
+        for (let b of blocks) {
+            if (b.solid && isCol(this, b) && this.vy>0) {
+                this.y = b.y - this.h; this.vy = -6; // 튕김
+            }
+        }
+        if (this.x - gameState.camX > canvas.width || this.x - gameState.camX < 0 || this.y > 600) this.active = false;
+    }
+    draw() {
+        if (!this.active) return;
+        ctx.fillStyle = '#ff5500'; ctx.fillRect(this.x-gameState.camX, this.y, this.w, this.h);
+    }
+}
+
+class Enemy {
+    constructor(c, r) {
+        this.w = 26; this.h = 26;
+        this.x = c*TS + 3; this.y = r*TS + 6;
+        this.vx = -1.2; this.vy = 0;
+        this.dead = false; this.deadTimer = 0;
+    }
+    update() {
+        if (this.dead) { this.deadTimer--; return; }
+        this.vy += GRAVITY;
+        this.x += this.vx;
+        for(let b of blocks) {
+            if(b.solid && isCol(this,b)) {
+                if(this.vx>0) { this.x=b.x-this.w; this.vx*=-1; }
+                else if(this.vx<0) { this.x=b.x+b.w; this.vx*=-1; }
+            }
+        }
+        this.y += this.vy;
+        for(let b of blocks) {
+            if(b.solid && isCol(this,b) && this.vy>0) { this.y=b.y-this.h; this.vy=0; }
+        }
+    }
+    draw() {
+        let sx = this.x - gameState.camX;
+        if(sx < -this.w || sx > 800) return;
+        ctx.save();
+        if (this.dead) {
+            ctx.fillStyle = '#8b4513'; ctx.fillRect(sx, this.y+16, this.w, 10); // 눌림
+        } else {
+            ctx.fillStyle = '#8b4513'; ctx.fillRect(sx, this.y, this.w, this.h);
+            ctx.fillStyle = '#fff'; ctx.fillRect(sx+4, this.y+6, 6, 8); ctx.fillRect(sx+16, this.y+6, 6, 8);
+            ctx.fillStyle = '#000'; ctx.fillRect(sx+6+(this.vx>0?2:0), this.y+8, 2, 4); ctx.fillRect(sx+18+(this.vx>0?2:0), this.y+8, 2, 4);
+        }
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x,y,c,s) { this.x=x;this.y=y;this.c=c;this.s=s;this.vx=(Math.random()-0.5)*10;this.vy=(Math.random()-1)*10;this.a=1; }
+    update() { this.x+=this.vx; this.y+=this.vy; this.vy+=GRAVITY; this.a-=0.03; }
+    draw() { if(this.a<=0)return; ctx.globalAlpha=this.a; ctx.fillStyle=this.c; ctx.fillRect(this.x-gameState.camX,this.y,this.s,this.s); ctx.globalAlpha=1; }
+}
+
+function isCol(a, b) {
+    return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+// ===============================================
+
+function showOverlay(title, msg, btnText) {
+    document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('mainTitle').innerHTML = title;
+    document.querySelector('#overlay p').innerHTML = msg;
+    document.getElementById('startBtn').innerText = btnText;
+    gameState.running = false;
+}
+
+function createParticles(x, y, color, amount) { for(let i=0; i<amount; i++) particles.push(new Particle(x,y,color, 4));  }
+function addScore(pts) { gameState.score += pts; scoreVal.innerText = String(gameState.score).padStart(6,'0'); }
+function addCoin() { gameState.coins++; if(gameState.coins>=100){ gameState.coins=0; addScore(1000); } coinVal.innerText = String(gameState.coins).padStart(2,'0'); }
+
+function changeArea(areaName, entryCol, entryRow) {
+    currentArea = areaName;
+    gameState.underGround = (areaName === 'underground');
+    container.style.backgroundColor = gameState.underGround ? '#000': '#5c94fc';
+    document.getElementById('worldVal').innerText = gameState.underGround ? "1-1U" : "1-1";
+    loadMap();
+    player.x = entryCol * TS;
+    player.y = (entryRow - 2) * TS;
+    gameState.camX = 0;
+    
+    // 워프 아웃 애니메이션
+    player.state = 'warpU';
+    player.warpTimer = 40;
+}
+
+function doWarpChange() {
+    // 워프가 끝났을때 방향 전환
+    if (currentArea === 'main') {
+        changeArea('underground', 2, 9); // 임시 위치
+    } else {
+        changeArea('main', 44, 11); // 지상의 튀어나오는 파이프 좌표 부근
+    }
+}
+
+function loadMap() {
+    blocks = []; enemies = []; items = []; fireballs = []; particles = []; goal = null;
+    let m = maps[currentArea];
+    for(let r=0; r<m.length; r++) {
+        for(let c=0; c<m[r].length; c++) {
+            let ch = m[r][c];
+            if(ch===' '||ch==='-') continue;
+            if(currentArea==='main' && ch==='M' && !player) player = new Player(c, r);
+            else if(ch==='E') enemies.push(new Enemy(c, r));
+            else if(ch==='F') goal = {x:c*TS, y:r*TS, w:10, h:10*TS, draw:function(){ 
+                let sx=this.x-gameState.camX; ctx.fillStyle='#fff'; ctx.fillRect(sx,this.y,this.w,this.h); 
+                ctx.fillStyle='#0f0'; ctx.beginPath(); ctx.moveTo(sx, this.y+20); ctx.lineTo(sx-30,this.y+35); ctx.lineTo(sx,this.y+50); ctx.fill();
+            }};
+            else if(ch==='C') items.push(new Coin(c,r));
+            else blocks.push(new Block(c, r, ch));
+            
+            // 파이프 로직위해 H중복 피하기용 넓게 뛰는건 블록 내부에서 폭만 넓힘 
+        }
+    }
+}
+
+function loop(t) {
+    if(!gameState.running || gameState.paused) return;
+
+    // Timer
+    if(t - gameState.lastT > 1000) {
+        if(player.state!=='win'&&player.state!=='dead') {
+            gameState.time--; timeVal.innerText = String(gameState.time).padStart(3,'0');
+            if(gameState.time<=0) player.damage();
+        }
+        gameState.lastT = t;
+    }
+
+    ctx.clearRect(0,0,800,480);
+
+    // 카메라
+    if (player.state !== 'warpD' && player.state !== 'warpU') {
+        let tgtX = player.x - 300;
+        if(tgtX > gameState.camX) gameState.camX = tgtX;
+        let mapW = maps[currentArea][0].length * TS;
+        if(gameState.camX > mapW - 800) gameState.camX = mapW - 800;
+    }
+
+    player.update();
+
+    // 깃발 충돌
+    if (goal && player.state!=='dead' && player.state!=='win') {
+        if(player.x+player.w > goal.x) {
+            player.state = 'win'; player.vx = 0; player.x = goal.x - player.w/2; addScore(2000);
+            setTimeout(()=> showOverlay("STAGE CLEAR", "가볍게 놀아주셔서 감사합니다!", "RETRY"), 3000);
+        }
+    }
+
+    // 아이템 로직 (버섯, 꽃, 허공 코인)
+    for(let i=items.length-1; i>=0; i--) {
+        let it = items[i];
+        it.update();
+        if(it.active && isCol(player, it)) {
+            it.active = false;
+            if (it instanceof Coin) {
+                addCoin(); addScore(100); createParticles(it.x+8,it.y,'#ff0',5);
+            } else {
+                addScore(1000);
+                createParticles(it.x, it.y, '#fff', 10);
+                if (it.kind === 'MUSHROOM' && player.power === 0) player.setPower(1);
+                else if (it.kind === 'FLOWER' && player.power < 2) player.setPower(2);
+            }
+        }
+        if(!it.active) items.splice(i, 1);
+        else it.draw();
+    }
+
+    // 파이어볼
+    for(let i=fireballs.length-1; i>=0; i--) {
+        let fb = fireballs[i];
+        fb.update();
+        if(!fb.active) { fireballs.splice(i,1); continue; }
+        
+        // 적 충돌
+        for(let e of enemies) {
+            if(!e.dead && isCol(fb, e)) {
+                e.dead = true; e.deadTimer = 20; fb.active = false; addScore(200);
+                createParticles(e.x, e.y, '#f00', 8); break;
+            }
+        }
+        fb.draw();
+    }
+
+    // 적
+    for(let i=enemies.length-1; i>=0; i--) {
+        let e = enemies[i];
+        e.update();
+        if(!e.dead && player.state!=='dead' && player.state!=='win' && player.invincT<=0) {
+            if(isCol(player, e)) {
+                // [핵심] 이전 프레임 마리오 발바닥 위치로 '위에서 내려왔는지' 정확히 판단
+                // player.lastBottom: 매 프레임 저장해둔 '직전 발바닥 Y좌표'
+                const stomped = player.lastBottom <= e.y + 6; // 이전 프레임에서 적 머리의 상단 근처보다 위에 있었으면 밟기
+                if(stomped) {
+                    e.dead = true; e.deadTimer = 30; player.vy = -9; addScore(200);
+                    createParticles(e.x + e.w/2, e.y, '#8b4513', 5);
+                } else {
+                    player.damage(); // 옆이나 아래에서 닿으면 데미지
+                }
+            }
+        }
+        if(e.dead && e.deadTimer<=0) enemies.splice(i,1);
+        else e.draw();
+    }
+
+    // 블록 & 파티클 & 깃발
+    if(goal) goal.draw();
+    for(let b of blocks) b.draw();
+    for(let p of particles) { p.update(); p.draw(); }
+    
+    player.draw(); // 주인공 맨 위
+
+    if(gameState.running) requestAnimationFrame(loop);
+}
+
+// ===============================================
+// 컨트롤
+// ===============================================
+window.addEventListener('keydown', e => {
+    if(e.key==='ArrowLeft') keys.left=true; if(e.key==='ArrowRight') keys.right=true;
+    if(e.key==='ArrowDown') keys.down=true;
+    if(e.key==='z' || e.key==='Z' || e.key===' ' || e.key==='ArrowUp') keys.jump=true; 
+    if(e.key==='x' || e.key==='X') keys.fire=true;
+    
+    if(e.key==='Escape' || e.key==='Esc' || e.code==='Escape' || e.key.toLowerCase()==='p') {
+        e.preventDefault();
+        togglePause();
+    }
+});
+window.addEventListener('keyup', e => {
+    if(e.key==='ArrowLeft') keys.left=false; if(e.key==='ArrowRight') keys.right=false;
+    if(e.key==='ArrowDown') keys.down=false;
+    if(e.key==='z' || e.key==='Z' || e.key===' ' || e.key==='ArrowUp') keys.jump=false; 
+    if(e.key==='x' || e.key==='X') keys.fire=false;
+});
+
+function bindBtn(btn, key) {
+    btn.addEventListener('touchstart', e=>{ e.preventDefault(); keys[key]=true; btn.style.transform='scale(0.9)'; });
+    btn.addEventListener('touchend', e=>{ e.preventDefault(); keys[key]=false; btn.style.transform='scale(1)'; });
+    btn.addEventListener('mousedown', ()=>{ keys[key]=true; });
+    btn.addEventListener('mouseup', ()=>{ keys[key]=false; });
+    btn.addEventListener('mouseleave', ()=>{ keys[key]=false; });
+}
+bindBtn(document.getElementById('btnLeft'), 'left');
+bindBtn(document.getElementById('btnRight'), 'right');
+bindBtn(document.getElementById('btnDown'), 'down');
+bindBtn(document.getElementById('btnJump'), 'jump');
+bindBtn(document.getElementById('btnFire'), 'fire');
+
+document.getElementById('startBtn').addEventListener('click', () => {
+    document.getElementById('overlay').style.display = 'none';
+    gameState.score = 0; gameState.coins = 0; gameState.time = 400; gameState.camX = 0;
+    document.getElementById('scoreVal').innerText='000000'; 
+    document.getElementById('coinVal').innerText='00';
+    
+    player = null;
+    currentArea = 'main';
+    gameState.underGround = false;
+    container.style.backgroundColor = '#5c94fc';
+    document.getElementById('worldVal').innerText = "1-1";
+    loadMap(); // M 타일에서 새 플레이어 자동 생성됨
+    
+    player.power = 0; player.setPower(0);
+    player.state = 'idle'; player.invincT = 0;
+    
+    if(!gameState.running) {
+        gameState.running = true;
+        gameState.paused = false;
+        gameState.lastT = performance.now();
+        requestAnimationFrame(loop);
+    }
+});
+
+function togglePause() {
+    if (!gameState.running && !gameState.paused) return;
+    gameState.paused = !gameState.paused;
+    document.getElementById('pauseOverlay').style.display = gameState.paused ? 'flex' : 'none';
+    if (!gameState.paused) {
+        gameState.lastT = performance.now();
+        requestAnimationFrame(loop);
+    }
+}
+
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('pauseLobbyBtn').addEventListener('click', () => {
+    window.parent.postMessage('backToLobby', '*');
+});
+document.getElementById('hudLobbyBtn').addEventListener('click', () => {
+    window.parent.postMessage('backToLobby', '*');
+});
+document.getElementById('hudPauseBtn').addEventListener('click', togglePause);
+
+</script>
+</body>
+</html>
